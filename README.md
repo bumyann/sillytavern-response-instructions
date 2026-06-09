@@ -1,9 +1,9 @@
 # Response Instructions + Write For Me
 Tired of Saucepan's 500 character limit? Me too. This adds response instructions (inject a quick prompt before the ai replies) and a write-for-me panel (let the ai draft your user message) straight into ST. Presets, no character limits, mobile friendly.
 
-Made this bc I loved Saucepan's's Response Instructions and Write For Me UI too much but kept getting pulled back to ST for how customizable it is — so I just. made it myself. now I don't have to choose lol.
+Made this bc I loved Saucepan's Response Instructions and Write For Me UI too much but kept getting pulled back to ST for how customizable it is — so I just. made it myself. now I don't have to choose lol.
 
-Disclaimer: I didn't actually make it. This shit is vibe-coded to the max. But I did test it before publishing it because I'm not a rat. Also, I'm aware Guided Generations, Impersonate, etc. exists but I want ultraspecific things and it's just not the same </3 Do what you will with this information.
+Disclaimer: I didn't actually make it. This shit is vibe-coded to the max. But I did test it before publishing it because I'm not a rat. Also, I'm aware Guided Generations, Impersonate, etc. exists but I want something simpler and ultra-speciific because I'm funny like that </3 Do what you will with this information.
 
 ---
 
@@ -17,7 +17,7 @@ Disclaimer: I didn't actually make it. This shit is vibe-coded to the max. But I
 - Injected as a system message at Author's Note depth (highest influence position)
 - Persists until you manually clear it
 
-### ✨ Write For Me
+### 🪄 Write For Me (Not to be confused with the Extensions button)
 - AI-powered message drafting panel, also above the chat input
 - Optionally write an instruction to steer how your message is written
 - Hit **Generate** — uses your currently connected ST API and model
@@ -28,17 +28,10 @@ Disclaimer: I didn't actually make it. This shit is vibe-coded to the max. But I
 ---
 
 ## Installation
-### Via SillyTavern (recommended)
 1. In ST, go to **Extensions** → **Install extension**
 2. Paste: `https://github.com/bumyann/sillytavern-response-instructions`
 3. Click **Save** — ST installs it automatically
 4. Enable it in the Extensions list
-
-### Manual
-1. Download this repo as a ZIP (Code → Download ZIP)
-2. Extract into `SillyTavern/public/extensions/third-party/`
-3. Make sure the folder is named `response-instructions` and contains `manifest.json`, `index.js`, and `style.css`
-4. Reload ST and enable the extension under Extensions
 
 ---
 
