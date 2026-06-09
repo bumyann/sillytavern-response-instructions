@@ -1,0 +1,11 @@
+{
+    "display_name": "Response Instructions",
+    "name": "response-instructions",
+    "version": "1.0.0",
+    "author": "bumyann",
+    "description": "Adds a per-message instruction box that injects into the system prompt as an Author's Note.",
+    "js": "index.js",
+    "css": "style.css",
+    "homepage": "",
+    "tags": ["prompt", "utility"]
+}
