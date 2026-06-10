@@ -31,9 +31,11 @@
         const s = getSettings();
         const c = ctx();
         if (s.enabled && s.text?.trim()) {
-            c.setExtensionPrompt(PROMPT_KEY, s.text.trim(), 1, 0, true);
+            const wrapped = `[RESPONSE INSTRUCTIONS — FOLLOW EXACTLY:\n${s.text.trim()}\n]`;
+            // Position 4 = bottom of prompt, last thing before generation
+            c.setExtensionPrompt(PROMPT_KEY, wrapped, 4, 0, true);
         } else {
-            c.setExtensionPrompt(PROMPT_KEY, '', 1, 0, false);
+            c.setExtensionPrompt(PROMPT_KEY, '', 4, 0, false);
         }
     }
 
