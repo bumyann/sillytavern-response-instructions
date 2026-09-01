@@ -575,3 +575,19 @@
     font-size: 0.8rem;
     resize: vertical;
 }
+
+/* ── WFM Preset Context Toggle ───────────────────────────────────── */
+.wfm-preset-toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 2px 0;
+    cursor: pointer;
+    user-select: none;
+}
+
+.wfm-preset-toggle-label {
+    font-size: 0.82rem;
+    color: var(--SmartThemeBodyColor, #aaa);
+    opacity: 0.8;
+}

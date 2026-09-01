@@ -115,6 +115,7 @@ CRITICAL RULES:
         wfm_presets: [],
         wfm_saved_drafts: [],
         templates: { ...DEFAULT_TEMPLATES },
+        wfm_include_preset: false,
     };
 
     function ctx() { return window.SillyTavern.getContext(); }
@@ -544,6 +545,13 @@ CRITICAL RULES:
         hideAll();
     }
 
+    function getPresetBlocks() {
+        const prompts = window.oai_settings?.prompts ?? [];
+        return prompts
+            .filter(p => p.enabled && !p.marker && p.content?.trim())
+            .map(p => ({ role: p.role === 'assistant' ? 'assistant' : 'system', content: p.content.trim() }));
+    }
+
     async function generateWfmDraft() {
         if (wfmGenerating) return;
         const c = ctx();
@@ -552,10 +560,10 @@ CRITICAL RULES:
         const s = getSettings();
         const tpls = { ...DEFAULT_TEMPLATES, ...s.templates };
 
-        const instruction = document.getElementById('wfm-instruction')?.value?.trim() || '';
-        const charName    = c.name2 || 'the character';
-        const userName    = c.name1 || 'User';
-        const currentDraft = document.getElementById('wfm-editor')?.value?.trim() || '';
+        const instruction   = document.getElementById('wfm-instruction')?.value?.trim() || '';
+        const charName      = c.name2 || 'the character';
+        const userName      = c.name1 || 'User';
+        const currentDraft  = document.getElementById('wfm-editor')?.value?.trim() || '';
 
         const recentMessages = (c.chat || []).slice(-10)
             .map(m => `${m.is_user ? userName : charName}: ${m.mes}`)
@@ -569,9 +577,15 @@ CRITICAL RULES:
             direction: instruction || 'Continue the scene naturally.',
         };
 
-        const systemPrompt   = renderTemplate(tpls.system_prompt, vars);
-        const userPromptTpl  = currentDraft ? tpls.rewrite_prompt : tpls.scratch_prompt;
-        const userPrompt     = renderTemplate(userPromptTpl, vars);
+        const systemPrompt  = renderTemplate(tpls.system_prompt, vars);
+        const userPromptTpl = currentDraft ? tpls.rewrite_prompt : tpls.scratch_prompt;
+        const userPrompt    = renderTemplate(userPromptTpl, vars);
+
+        // Build preset block prefix if enabled
+        const presetPrefix = s.wfm_include_preset
+            ? getPresetBlocks().map(b => b.content).join('\n\n').trim()
+            : '';
+        const fullSystem = presetPrefix ? `${presetPrefix}\n\n${systemPrompt}` : systemPrompt;
 
         wfmGenerating = true;
         const genBtn = document.getElementById('wfm-generate-btn');
@@ -582,7 +596,7 @@ CRITICAL RULES:
                 prompt: userPrompt,
                 quietToLoud: false,
                 instructOverride: false,
-                systemPrompt,
+                systemPrompt: fullSystem,
             });
             const text = (typeof result === 'string' ? result : result?.text || '').trim();
             if (text) {
@@ -737,6 +751,10 @@ CRITICAL RULES:
                 <div class="wfm-section-label">Instruction</div>
                 <textarea id="wfm-instruction" class="ri-textarea wfm-instruction"
                     placeholder="e.g. 'act shy and nervous', 'confess my feelings'…"></textarea>
+                <label class="wfm-preset-toggle-row" title="Prepend enabled prompt blocks from your active CC preset into the generation context">
+                    <input type="checkbox" id="wfm-include-preset" ${s.wfm_include_preset ? 'checked' : ''}>
+                    <span class="wfm-preset-toggle-label">Include preset context</span>
+                </label>
                 <div class="wfm-footer">
                     <button id="wfm-generate-btn" class="menu_button wfm-btn-generate">
                         <i class="fa-solid fa-wand-magic-sparkles"></i> Generate
@@ -884,6 +902,9 @@ CRITICAL RULES:
         document.getElementById('wfm-close-btn').addEventListener('click', hideAll);
         document.getElementById('wfm-generate-btn').addEventListener('click', generateWfmDraft);
         document.getElementById('wfm-use-btn').addEventListener('click', commitWfmDraft);
+        document.getElementById('wfm-include-preset').addEventListener('change', e => {
+            s.wfm_include_preset = e.target.checked; save();
+        });
         document.getElementById('wfm-save-draft-btn').addEventListener('click', saveDraft);
         document.getElementById('wfm-tab-draft').addEventListener('click', () => switchWfmTab('draft'));
         document.getElementById('wfm-tab-saved').addEventListener('click', () => switchWfmTab('saved'));
