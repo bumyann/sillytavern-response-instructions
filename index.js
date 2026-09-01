@@ -589,7 +589,7 @@ CRITICAL RULES:
         if (genBtn) { genBtn.disabled = true; genBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>'; }
 
         try {
-            // Inject preset context blocks if enabled
+            // Inject preset context if enabled
             if (s.wfm_include_preset) {
                 const blocks = getPresetBlocks();
                 if (blocks.length) {
@@ -601,21 +601,25 @@ CRITICAL RULES:
                 }
             }
 
-            // Inject ghostwriter system prompt
+            // Inject ghostwriter system directive at depth 0
             const escapedSystem = systemPrompt.replace(/\|/g, '\\|');
             await c.executeSlashCommandsWithOptions(
                 `/inject id=${WFM_SYSTEM_INJECT_ID} position=chat depth=0 role=system ${escapedSystem}`,
                 { showOutput: false }
             );
 
-            const result = await c.generateRaw({
-                prompt: userPrompt,
-                quietToLoud: false,
-                instructOverride: false,
-            });
+            // Store current input, then use /impersonate to run full pipeline
+            const textarea = document.getElementById('send_textarea');
+            const previousInput = textarea?.value ?? '';
+            const escapedUserPrompt = userPrompt.replace(/\|/g, '\\|');
+            await c.executeSlashCommandsWithOptions(
+                `/impersonate await=true ${escapedUserPrompt} |`,
+                { showOutput: false }
+            );
 
-            const text = (typeof result === 'string' ? result : result?.text || '').trim();
-            if (text) {
+            // Read result from textarea (impersonate puts it there)
+            const text = textarea?.value?.trim() ?? '';
+            if (text && text !== previousInput) {
                 wfmDrafts.push(text);
                 wfmCurrentDraft = wfmDrafts.length - 1;
                 updateDraftNav();
