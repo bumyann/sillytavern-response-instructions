@@ -530,3 +530,48 @@
     background: rgba(129,199,132,0.12) !important;
     box-shadow: none !important;
 }
+
+/* ── Templates Panel ─────────────────────────────────────────────── */
+.ri-tpl-body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px 12px;
+    max-height: 380px;
+    overflow-y: auto;
+}
+
+.ri-tpl-help {
+    font-size: 0.78rem;
+    color: var(--SmartThemeBodyColor, #aaa);
+    opacity: 0.75;
+    line-height: 1.4;
+}
+
+.ri-tpl-help code {
+    background: rgba(255,255,255,0.07);
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 0.76rem;
+}
+
+.ri-tpl-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.ri-tpl-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--SmartThemeBodyColor, #aaa);
+    opacity: 0.65;
+    font-weight: 600;
+}
+
+.ri-tpl-ta {
+    min-height: 80px;
+    font-size: 0.8rem;
+    resize: vertical;
+}

@@ -7,6 +7,29 @@
 
     console.log(`[SS] Saucepan Seasoning v${EXT_VERSION} loading…`);
 
+    // ── Prompt Templates ──────────────────────────────────────────────────────
+    const DEFAULT_TEMPLATES = {
+        system_prompt: `You are a creative fiction ghostwriter in an ongoing novel-style roleplay between {{user}} and {{char}}.
+Write the next in-character narrative response from the perspective of {{user}}.
+
+CRITICAL RULES:
+- Output ONLY the raw story prose. NEVER include thinking notes, explanations, conversational filler, or meta-commentary.
+- Match the established literary tone, narrative pacing, and scene setting exactly.
+- Preserve established character pronouns (e.g. if {{user}} or {{char}} is male, use he/him; never default to they/them if established).
+- Do NOT use script-asterisk actions (*sighs*). Write in novel prose.`,
+        rewrite_prompt: `### Recent Story Excerpt:\n{{context}}\n\n### User Draft:\n{{draft}}\n\n### Direction:\n{{direction}}\n\n[Output raw story reply now]:`,
+        scratch_prompt: `### Recent Story Excerpt:\n{{context}}\n\n### Direction:\n{{direction}}\n\n[Output raw story reply now]:`,
+    };
+
+    function renderTemplate(tpl, vars) {
+        return tpl
+            .replace(/\{\{user\}\}/g,      vars.user      || 'User')
+            .replace(/\{\{char\}\}/g,      vars.char      || 'Companion')
+            .replace(/\{\{context\}\}/g,   vars.context   || '(None)')
+            .replace(/\{\{draft\}\}/g,     vars.draft     || '(None)')
+            .replace(/\{\{direction\}\}/g, vars.direction || 'Continue the scene naturally.');
+    }
+
     // ── Simple mode chip definitions ──────────────────────────────────────────
     const SIMPLE_FIELDS = [
         {
@@ -84,16 +107,14 @@
     // ── Settings ──────────────────────────────────────────────────────────────
     const defaultSettings = {
         enabled: false,
-        ri_mode: 'simple',          // 'simple' | 'custom'
-        // simple mode state
+        ri_mode: 'simple',
         simple_selections: {},
         simple_custom_addon: '',
-        // custom mode state
         custom_text: '',
-        // shared
         presets: [],
         wfm_presets: [],
         wfm_saved_drafts: [],
+        templates: { ...DEFAULT_TEMPLATES },
     };
 
     function ctx() { return window.SillyTavern.getContext(); }
@@ -157,7 +178,7 @@
     }
 
     // ── Panel toggling ────────────────────────────────────────────────────────
-    const PANELS = ['ri-panel', 'ri-lib-panel', 'wfm-panel', 'wfm-lib-panel'];
+    const PANELS = ['ri-panel', 'ri-lib-panel', 'wfm-panel', 'wfm-lib-panel', 'tpl-panel'];
 
     function showPanel(id) {
         PANELS.forEach(p => {
@@ -528,17 +549,29 @@
         const c = ctx();
         if (!c.generateRaw) { window.toastr?.error('generateRaw not available.'); return; }
 
-        const instruction = document.getElementById('wfm-instruction')?.value?.trim() || '';
-        const charName = c.name2 || 'the character';
-        const userName = c.name1 || 'User';
-        const recentMessages = (c.chat || []).slice(-10)
-            .map(m => `${m.is_user ? userName : charName}: ${m.mes}`).join('\n');
+        const s = getSettings();
+        const tpls = { ...DEFAULT_TEMPLATES, ...s.templates };
 
-        let prompt = `[Write ${userName}'s next message in this roleplay with ${charName}. Write ONLY the message content, no labels or preamble.`;
-        if (instruction) prompt += ` Instruction: ${instruction}.`;
-        prompt += `]\n\n`;
-        if (recentMessages) prompt += `Recent conversation:\n${recentMessages}\n\n`;
-        prompt += `${userName}:`;
+        const instruction = document.getElementById('wfm-instruction')?.value?.trim() || '';
+        const charName    = c.name2 || 'the character';
+        const userName    = c.name1 || 'User';
+        const currentDraft = document.getElementById('wfm-editor')?.value?.trim() || '';
+
+        const recentMessages = (c.chat || []).slice(-10)
+            .map(m => `${m.is_user ? userName : charName}: ${m.mes}`)
+            .join('\n');
+
+        const vars = {
+            user:      userName,
+            char:      charName,
+            context:   recentMessages || '(No recent messages)',
+            draft:     currentDraft,
+            direction: instruction || 'Continue the scene naturally.',
+        };
+
+        const systemPrompt   = renderTemplate(tpls.system_prompt, vars);
+        const userPromptTpl  = currentDraft ? tpls.rewrite_prompt : tpls.scratch_prompt;
+        const userPrompt     = renderTemplate(userPromptTpl, vars);
 
         wfmGenerating = true;
         const genBtn = document.getElementById('wfm-generate-btn');
@@ -546,10 +579,10 @@
 
         try {
             const result = await c.generateRaw({
-                prompt,
+                prompt: userPrompt,
                 quietToLoud: false,
                 instructOverride: false,
-                systemPrompt: `You are helping ${userName} write their next message in a roleplay with ${charName}. Write ONLY the message content, no labels or preamble.`,
+                systemPrompt,
             });
             const text = (typeof result === 'string' ? result : result?.text || '').trim();
             if (text) {
@@ -673,6 +706,9 @@
                     <button id="wfm-lib-btn" class="ri-icon-btn" title="Instruction presets">
                         <i class="fa-solid fa-folder-open"></i>
                     </button>
+                    <button id="wfm-tpl-btn" class="ri-icon-btn" title="Prompt Templates">
+                        <i class="fa-solid fa-gear"></i>
+                    </button>
                     <button id="wfm-close-btn" class="ri-icon-btn" title="Close">
                         <i class="fa-solid fa-xmark"></i>
                     </button>
@@ -740,6 +776,43 @@
             </div>
             <div id="wfm-preset-list" class="ri-preset-list"></div>`;
         bar.parentNode.insertBefore(wfmLibPanel, bar);
+
+        // ── Templates Panel ──
+        const tplPanel = document.createElement('div');
+        tplPanel.id = 'tpl-panel';
+        tplPanel.className = 'ri-panel';
+        tplPanel.style.display = 'none';
+        const tpls = { ...DEFAULT_TEMPLATES, ...s.templates };
+        tplPanel.innerHTML = `
+            <div class="ri-panel-header">
+                <span class="ri-panel-title"><i class="fa-solid fa-gear"></i> Prompt Templates</span>
+                <div class="ri-panel-controls">
+                    <button id="tpl-reset-btn" class="ri-icon-btn" title="Reset to defaults">
+                        <i class="fa-solid fa-rotate-left"></i>
+                    </button>
+                    <button id="tpl-close-btn" class="ri-icon-btn" title="Close">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="ri-tpl-body">
+                <div class="ri-tpl-help">
+                    Variables: <code>{{user}}</code>, <code>{{char}}</code>, <code>{{context}}</code>, <code>{{draft}}</code>, <code>{{direction}}</code>
+                </div>
+                <div class="ri-tpl-field">
+                    <div class="ri-tpl-label">System Directive</div>
+                    <textarea id="tpl-system" class="ri-textarea ri-tpl-ta">${escapeHtml(tpls.system_prompt)}</textarea>
+                </div>
+                <div class="ri-tpl-field">
+                    <div class="ri-tpl-label">Rewrite / Enhance Template (When Draft Exists)</div>
+                    <textarea id="tpl-rewrite" class="ri-textarea ri-tpl-ta">${escapeHtml(tpls.rewrite_prompt)}</textarea>
+                </div>
+                <div class="ri-tpl-field">
+                    <div class="ri-tpl-label">Scratch Generation Template (When Draft is Blank)</div>
+                    <textarea id="tpl-scratch" class="ri-textarea ri-tpl-ta">${escapeHtml(tpls.scratch_prompt)}</textarea>
+                </div>
+            </div>`;
+        bar.parentNode.insertBefore(tplPanel, bar);
 
         // ── Wire: bar buttons ──
         addTapListener(document.getElementById('ri-bar-ri-btn'), () => {
@@ -823,11 +896,35 @@
         document.getElementById('wfm-lib-btn').addEventListener('click', () => {
             renderWfmPresets(); showPanel('wfm-lib-panel');
         });
+        document.getElementById('wfm-tpl-btn').addEventListener('click', () => showPanel('tpl-panel'));
 
         // ── Wire: WFM library ──
         document.getElementById('wfm-lib-back-btn').addEventListener('click', () => showPanel('wfm-panel'));
         document.getElementById('wfm-lib-close-btn').addEventListener('click', hideAll);
         document.getElementById('wfm-save-preset-btn').addEventListener('click', saveWfmPreset);
+
+        // ── Wire: Templates panel ──
+        document.getElementById('tpl-close-btn').addEventListener('click', hideAll);
+        document.getElementById('tpl-reset-btn').addEventListener('click', () => {
+            s.templates = { ...DEFAULT_TEMPLATES };
+            document.getElementById('tpl-system').value  = DEFAULT_TEMPLATES.system_prompt;
+            document.getElementById('tpl-rewrite').value = DEFAULT_TEMPLATES.rewrite_prompt;
+            document.getElementById('tpl-scratch').value = DEFAULT_TEMPLATES.scratch_prompt;
+            save();
+            window.toastr?.success('Templates reset to defaults.');
+        });
+        document.getElementById('tpl-system').addEventListener('input', e => {
+            if (!s.templates) s.templates = { ...DEFAULT_TEMPLATES };
+            s.templates.system_prompt = e.target.value; save();
+        });
+        document.getElementById('tpl-rewrite').addEventListener('input', e => {
+            if (!s.templates) s.templates = { ...DEFAULT_TEMPLATES };
+            s.templates.rewrite_prompt = e.target.value; save();
+        });
+        document.getElementById('tpl-scratch').addEventListener('input', e => {
+            if (!s.templates) s.templates = { ...DEFAULT_TEMPLATES };
+            s.templates.scratch_prompt = e.target.value; save();
+        });
 
         // ── Init ──
         if (isSimple) renderChips();
