@@ -545,11 +545,14 @@ CRITICAL RULES:
         hideAll();
     }
 
+    const WFM_PRESET_INJECT_ID = 'ss_wfm_preset_context';
+    const WFM_SYSTEM_INJECT_ID = 'ss_wfm_system';
+
     function getPresetBlocks() {
         const prompts = window.oai_settings?.prompts ?? [];
         return prompts
             .filter(p => p.enabled && !p.marker && p.content?.trim())
-            .map(p => ({ role: p.role === 'assistant' ? 'assistant' : 'system', content: p.content.trim() }));
+            .map(p => p.content.trim());
     }
 
     async function generateWfmDraft() {
@@ -560,10 +563,10 @@ CRITICAL RULES:
         const s = getSettings();
         const tpls = { ...DEFAULT_TEMPLATES, ...s.templates };
 
-        const instruction   = document.getElementById('wfm-instruction')?.value?.trim() || '';
-        const charName      = c.name2 || 'the character';
-        const userName      = c.name1 || 'User';
-        const currentDraft  = document.getElementById('wfm-editor')?.value?.trim() || '';
+        const instruction  = document.getElementById('wfm-instruction')?.value?.trim() || '';
+        const charName     = c.name2 || 'the character';
+        const userName     = c.name1 || 'User';
+        const currentDraft = document.getElementById('wfm-editor')?.value?.trim() || '';
 
         const recentMessages = (c.chat || []).slice(-10)
             .map(m => `${m.is_user ? userName : charName}: ${m.mes}`)
@@ -581,26 +584,36 @@ CRITICAL RULES:
         const userPromptTpl = currentDraft ? tpls.rewrite_prompt : tpls.scratch_prompt;
         const userPrompt    = renderTemplate(userPromptTpl, vars);
 
-        // Build message array: preset blocks → ghostwriter system → user prompt
-        const messages = [];
-        if (s.wfm_include_preset) {
-            for (const block of getPresetBlocks()) {
-                messages.push({ role: block.role, content: block.content });
-            }
-        }
-        messages.push({ role: 'system', content: systemPrompt });
-        messages.push({ role: 'user',   content: userPrompt });
-
         wfmGenerating = true;
         const genBtn = document.getElementById('wfm-generate-btn');
         if (genBtn) { genBtn.disabled = true; genBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>'; }
 
         try {
+            // Inject preset context blocks if enabled
+            if (s.wfm_include_preset) {
+                const blocks = getPresetBlocks();
+                if (blocks.length) {
+                    const presetContent = blocks.join('\n\n').replace(/\|/g, '\\|');
+                    await c.executeSlashCommandsWithOptions(
+                        `/inject id=${WFM_PRESET_INJECT_ID} position=chat depth=999 role=system ${presetContent}`,
+                        { showOutput: false }
+                    );
+                }
+            }
+
+            // Inject ghostwriter system prompt
+            const escapedSystem = systemPrompt.replace(/\|/g, '\\|');
+            await c.executeSlashCommandsWithOptions(
+                `/inject id=${WFM_SYSTEM_INJECT_ID} position=chat depth=0 role=system ${escapedSystem}`,
+                { showOutput: false }
+            );
+
             const result = await c.generateRaw({
-                prompt: messages,
+                prompt: userPrompt,
                 quietToLoud: false,
                 instructOverride: false,
             });
+
             const text = (typeof result === 'string' ? result : result?.text || '').trim();
             if (text) {
                 wfmDrafts.push(text);
@@ -613,6 +626,9 @@ CRITICAL RULES:
             console.error('[SS] WFM error:', err?.message || err);
             window.toastr?.error(`Generation failed: ${err?.message || 'unknown error'}`);
         } finally {
+            // Always clean up injections
+            await c.executeSlashCommandsWithOptions(`/inject id=${WFM_SYSTEM_INJECT_ID}`, { showOutput: false }).catch(() => {});
+            await c.executeSlashCommandsWithOptions(`/inject id=${WFM_PRESET_INJECT_ID}`, { showOutput: false }).catch(() => {});
             wfmGenerating = false;
             if (genBtn) { genBtn.disabled = false; genBtn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Generate'; }
         }
