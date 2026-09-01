@@ -581,11 +581,15 @@ CRITICAL RULES:
         const userPromptTpl = currentDraft ? tpls.rewrite_prompt : tpls.scratch_prompt;
         const userPrompt    = renderTemplate(userPromptTpl, vars);
 
-        // Build preset block prefix if enabled
-        const presetPrefix = s.wfm_include_preset
-            ? getPresetBlocks().map(b => b.content).join('\n\n').trim()
-            : '';
-        const fullSystem = presetPrefix ? `${presetPrefix}\n\n${systemPrompt}` : systemPrompt;
+        // Build message array: preset blocks → ghostwriter system → user prompt
+        const messages = [];
+        if (s.wfm_include_preset) {
+            for (const block of getPresetBlocks()) {
+                messages.push({ role: block.role, content: block.content });
+            }
+        }
+        messages.push({ role: 'system', content: systemPrompt });
+        messages.push({ role: 'user',   content: userPrompt });
 
         wfmGenerating = true;
         const genBtn = document.getElementById('wfm-generate-btn');
@@ -593,10 +597,9 @@ CRITICAL RULES:
 
         try {
             const result = await c.generateRaw({
-                prompt: userPrompt,
+                prompt: messages,
                 quietToLoud: false,
                 instructOverride: false,
-                systemPrompt: fullSystem,
             });
             const text = (typeof result === 'string' ? result : result?.text || '').trim();
             if (text) {
